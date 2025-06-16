@@ -2,7 +2,20 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import Icon from "@/components/ui/icon";
+import ProductEditModal from "@/components/ProductEditModal";
 
 interface Product {
   id: string;
@@ -22,8 +35,13 @@ interface ProductGalleryProps {
 
 const ProductGallery = ({ activeFilter }: ProductGalleryProps) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isNewProduct, setIsNewProduct] = useState(false);
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
 
-  const products: Product[] = [
+  const [products, setProducts] = useState<Product[]>([
     {
       id: "1",
       name: 'Меч Данте "Rebellion"',
@@ -92,11 +110,38 @@ const ProductGallery = ({ activeFilter }: ProductGalleryProps) => {
       rating: 4.9,
       inStock: true,
     },
-  ];
+  ]);
 
   const filteredProducts = activeFilter
     ? products.filter((product) => product.character === activeFilter)
     : products;
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setIsNewProduct(false);
+    setIsEditModalOpen(true);
+  };
+
+  const handleAddProduct = () => {
+    setEditingProduct(null);
+    setIsNewProduct(true);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveProduct = (updatedProduct: Product) => {
+    if (isNewProduct) {
+      setProducts([...products, updatedProduct]);
+    } else {
+      setProducts(
+        products.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)),
+      );
+    }
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    setProducts(products.filter((p) => p.id !== productId));
+    setDeleteProductId(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -104,22 +149,44 @@ const ProductGallery = ({ activeFilter }: ProductGalleryProps) => {
         <h2 className="text-2xl font-bold text-white">
           Каталог товаров {activeFilter && `(${filteredProducts.length})`}
         </h2>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-dmc-gray text-dmc-gray-light"
-          >
-            <Icon name="Filter" size={16} className="mr-2" />
-            Сортировка
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-dmc-gray text-dmc-gray-light"
-          >
-            <Icon name="Grid3X3" size={16} />
-          </Button>
+        <div className="flex gap-4 items-center">
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={isAdminMode}
+              onCheckedChange={setIsAdminMode}
+              className="data-[state=checked]:bg-dmc-red"
+            />
+            <Label className="text-dmc-gray-light">Режим админа</Label>
+          </div>
+
+          {isAdminMode && (
+            <Button
+              onClick={handleAddProduct}
+              className="bg-green-600 hover:bg-green-700"
+              size="sm"
+            >
+              <Icon name="Plus" size={16} className="mr-2" />
+              Добавить товар
+            </Button>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-dmc-gray text-dmc-gray-light"
+            >
+              <Icon name="Filter" size={16} className="mr-2" />
+              Сортировка
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-dmc-gray text-dmc-gray-light"
+            >
+              <Icon name="Grid3X3" size={16} />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -156,6 +223,33 @@ const ProductGallery = ({ activeFilter }: ProductGalleryProps) => {
               </div>
 
               <div className="p-4 space-y-3">
+                {isAdminMode && (
+                  <div className="flex gap-2 mb-3">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditProduct(product);
+                      }}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Icon name="Edit" size={14} className="mr-1" />
+                      Изменить
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteProductId(product.id);
+                      }}
+                      size="sm"
+                      variant="destructive"
+                    >
+                      <Icon name="Trash2" size={14} className="mr-1" />
+                      Удалить
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-xs">
                     {product.category}
@@ -216,6 +310,43 @@ const ProductGallery = ({ activeFilter }: ProductGalleryProps) => {
           </p>
         </div>
       )}
+
+      <ProductEditModal
+        product={editingProduct}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveProduct}
+        isNew={isNewProduct}
+      />
+
+      <AlertDialog
+        open={!!deleteProductId}
+        onOpenChange={() => setDeleteProductId(null)}
+      >
+        <AlertDialogContent className="bg-dmc-dark border-dmc-gray">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">
+              Удалить товар?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-dmc-gray-light">
+              Это действие нельзя отменить. Товар будет удален из каталога.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-dmc-gray text-dmc-gray-light">
+              Отмena
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                deleteProductId && handleDeleteProduct(deleteProductId)
+              }
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
